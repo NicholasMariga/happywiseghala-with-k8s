@@ -1,0 +1,883 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-js
+  namespace: happywiseghala
+data:
+  app.js: |
+    const API = '/api';
+    let state = { products:[], categories:[], suppliers:[], customers:[], sales:[], grns:[], adjustments:[], staff:[], audit:[], cart:[], currentReport:null, resetPwdStaffId:null, editCatId:null, editSupId:null, editCustId:null };
+    let barChart=null, donutChart=null;
+
+    // ── UTILS ──────────────────────────────────────────────────────────────────
+    const fmt = n => 'KES ' + parseFloat(n||0).toLocaleString('en-KE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fmtNum = n => parseFloat(n||0).toLocaleString('en-KE',{minimumFractionDigits:2,maximumFractionDigits:2});
+    const fmtDate = d => d ? new Date(d).toLocaleDateString('en-KE',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+    const fmtDateTime = d => d ? new Date(d).toLocaleString('en-KE',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+
+    function showAlert(id, msg, type='error') {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = `alert alert-${type} show`;
+      el.innerHTML = `<i class="fa-solid fa-${type==='success'?'circle-check':'circle-xmark'}"></i> ${msg}`;
+      if (type==='success') setTimeout(()=>{ el.className='alert'; }, 3000);
+    }
+    function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+    function openModal(id) { document.getElementById(id).classList.add('show'); }
+
+    async function api(path, method='GET', body=null) {
+      const opts = { method, headers:{'Content-Type':'application/json'}, credentials:'include' };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(API+path, opts);
+      const data = await r.json().catch(()=>({}));
+      if (!r.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    // ── AUTH ───────────────────────────────────────────────────────────────────
+    async function doLogin() {
+      const username = document.getElementById('login-username').value.trim();
+      const password = document.getElementById('login-password').value;
+      if (!username||!password) return;
+      try {
+        const user = await api('/login','POST',{username,password});
+        document.getElementById('topbar-name').textContent = user.name;
+        document.getElementById('topbar-role').textContent = user.role;
+        document.getElementById('login-page').style.display='none';
+        document.getElementById('app-page').classList.add('show');
+        applyRoleVisibility(user.role);
+        await loadAll();
+        showPage('dashboard');
+      } catch(e) {
+        const el = document.getElementById('login-error');
+        document.getElementById('login-err-msg').textContent = e.message;
+        el.classList.add('show');
+      }
+    }
+
+    async function doLogout() {
+      await api('/logout','POST');
+      location.reload();
+    }
+
+    function applyRoleVisibility(role) {
+      const mgmtOnly = ['nav-staff','nav-audit','nav-settings'];
+      if (role==='storekeeper') {
+        mgmtOnly.forEach(c => { const el=document.querySelector('.'+c); if(el) el.style.display='none'; });
+        document.getElementById('page-staff') && (document.getElementById('page-staff').style.display='none');
+        document.getElementById('page-audit') && (document.getElementById('page-audit').style.display='none');
+        document.getElementById('page-settings') && (document.getElementById('page-settings').style.display='none');
+      }
+    }
+
+    // ── NAVIGATION ─────────────────────────────────────────────────────────────
+    function showPage(name, event) {
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      const pg = document.getElementById('page-'+name);
+      if (pg) pg.classList.add('active');
+      if (event && event.currentTarget) event.currentTarget.classList.add('active');
+      else { document.querySelectorAll('.nav-item').forEach(n=>{ if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'")) n.classList.add('active'); }); }
+      const loaders = { dashboard:loadDashboard, products:loadProducts, categories:loadCategories, stockin:loadGrns, sales:loadSalesPage, adjustments:loadAdjustments, suppliers:loadSuppliers, customers:loadCustomers, staff:loadStaff, audit:loadAudit, settings:loadSettings };
+      if (loaders[name]) loaders[name]();
+    }
+
+    // ── LOAD ALL ───────────────────────────────────────────────────────────────
+    async function loadAll() {
+      await Promise.all([loadProductsData(), loadCategoriesData(), loadSuppliersData(), loadCustomersData()]);
+    }
+
+    async function loadProductsData() {
+      state.products = await api('/products');
+      populateProductSelects();
+    }
+    async function loadCategoriesData() {
+      state.categories = await api('/categories');
+      populateCategorySelects();
+    }
+    async function loadSuppliersData() {
+      state.suppliers = await api('/suppliers');
+      populateSupplierSelects();
+    }
+    async function loadCustomersData() {
+      state.customers = await api('/customers');
+      populateCustomerSelects();
+    }
+
+    function populateProductSelects() {
+      const opts = '<option value="">Select product...</option>' + state.products.map(p=>`<option value="${p.id}" data-price="${p.selling_price}" data-unit="${p.unit}" data-stock="${p.current_stock}">${p.name} (${fmtNum(p.current_stock)} ${p.unit})</option>`).join('');
+      document.querySelectorAll('.product-select').forEach(s=>{ s.innerHTML=opts; });
+      const adjSel = document.getElementById('adj-product');
+      if (adjSel) adjSel.innerHTML = opts;
+      // filter dropdowns
+      const cats = ['<option value="">All Categories</option>', ...state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`)].join('');
+      const catFilters = ['filter-product-cat','p-category'];
+      catFilters.forEach(id=>{ const el=document.getElementById(id); if(el){ if(id==='p-category') el.innerHTML='<option value="">— No Category —</option>'+state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join(''); else el.innerHTML=cats; } });
+    }
+
+    function populateCategorySelects() {
+      const opts = '<option value="">— No Category —</option>' + state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+      const el = document.getElementById('p-category');
+      if (el) el.innerHTML = opts;
+      const fc = document.getElementById('filter-product-cat');
+      if (fc) fc.innerHTML = '<option value="">All Categories</option>' + state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    function populateSupplierSelects() {
+      const opts = '<option value="">— Walk-in / Unknown —</option>' + state.suppliers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+      const el = document.getElementById('grn-supplier');
+      if (el) el.innerHTML = opts;
+      document.querySelectorAll('.supplier-select').forEach(s=>s.innerHTML=opts);
+    }
+
+    function populateCustomerSelects() {
+      const opts = '<option value="">Walk-in Customer</option>' + state.customers.map(c=>`<option value="${c.id}">${c.name}${c.phone?' ('+c.phone+')':''}</option>`).join('');
+      const el = document.getElementById('sale-customer');
+      if (el) el.innerHTML = opts;
+    }
+
+    // ── DASHBOARD ──────────────────────────────────────────────────────────────
+    async function loadDashboard() {
+      const d = await api('/dashboard');
+      document.getElementById('d-products').textContent = d.total_products;
+      document.getElementById('d-cost-val').textContent = fmt(d.stock_cost_value);
+      document.getElementById('d-retail-val').textContent = fmt(d.stock_retail_value);
+      document.getElementById('d-today').textContent = fmt(d.today_sales);
+      document.getElementById('d-month').textContent = fmt(d.month_sales);
+      document.getElementById('d-low').textContent = d.low_stock_count;
+      document.getElementById('d-out').textContent = d.out_of_stock_count;
+      document.getElementById('d-expiry').textContent = d.expiring_soon;
+
+      // Sales trend chart
+      const labels = d.sales_trend.map(r=>r.day);
+      const vals = d.sales_trend.map(r=>parseFloat(r.total));
+      if (barChart) barChart.destroy();
+      barChart = new Chart(document.getElementById('salesTrendChart').getContext('2d'), {
+        type:'bar',
+        data:{ labels, datasets:[{ label:'Sales (KES)', data:vals, backgroundColor:'rgba(16,185,129,0.5)', borderColor:'#10b981', borderWidth:1, borderRadius:4 }] },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ticks:{color:'#6b7280',font:{size:10}}}, y:{ticks:{color:'#6b7280',font:{size:10}}, grid:{color:'rgba(255,255,255,0.05)'}} } }
+      });
+
+      // Top products donut
+      if (donutChart) donutChart.destroy();
+      if (d.top_products.length) {
+        donutChart = new Chart(document.getElementById('topProductsChart').getContext('2d'), {
+          type:'doughnut',
+          data:{ labels:d.top_products.map(p=>p.name), datasets:[{ data:d.top_products.map(p=>parseFloat(p.qty_sold)), backgroundColor:['#10b981','#60a5fa','#a78bfa','#fbbf24','#f87171'], borderWidth:0 }] },
+          options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom',labels:{color:'#9ca3af',font:{size:10},boxWidth:10}} } }
+        });
+      }
+
+      // Low stock table
+      const tbody = document.getElementById('low-stock-table');
+      tbody.innerHTML = d.low_stock_items.length ? d.low_stock_items.map(p=>`
+        <tr><td>${p.name}</td><td>${p.category_name||'—'}</td><td>${p.unit}</td>
+        <td class="${p.current_stock===0?'stock-critical':p.current_stock<=p.reorder_level?'stock-low':'stock-ok'}">${fmtNum(p.current_stock)}</td>
+        <td>${fmtNum(p.reorder_level)}</td>
+        <td><span class="badge badge-${p.current_stock===0?'red':'yellow'}">${p.current_stock===0?'Out of Stock':'Low Stock'}</span></td></tr>
+      `).join('') : '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:20px">All stock levels are healthy</td></tr>';
+
+      // Recent sales
+      const rtbody = document.getElementById('recent-sales-table');
+      rtbody.innerHTML = d.recent_sales.map(s=>`
+        <tr><td>${s.invoice_number}</td><td>${s.customer_name}</td><td>${fmt(s.total_amount)}</td>
+        <td><span class="badge badge-blue">${s.payment_method}</span></td>
+        <td><span class="badge badge-${s.payment_status==='paid'?'green':'yellow'}">${s.payment_status}</span></td>
+        <td>${fmtDateTime(s.created_at)}</td></tr>
+      `).join('') || '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:20px">No sales yet</td></tr>';
+    }
+
+    // ── PRODUCTS ───────────────────────────────────────────────────────────────
+    async function loadProducts() {
+      await loadProductsData();
+      renderProducts(state.products);
+    }
+
+    function renderProducts(prods) {
+      const tbody = document.getElementById('products-table');
+      tbody.innerHTML = prods.map(p => {
+        const stockClass = p.current_stock===0?'stock-critical':parseFloat(p.current_stock)<=parseFloat(p.reorder_level)?'stock-low':'stock-ok';
+        const stockBadge = p.current_stock===0?'badge-red':parseFloat(p.current_stock)<=parseFloat(p.reorder_level)?'badge-yellow':'badge-green';
+        return `<tr>
+          <td><strong>${p.name}</strong></td>
+          <td style="color:#9ca3af">${p.sku||'—'}</td>
+          <td>${p.category_name||'—'}</td>
+          <td>${p.unit}</td>
+          <td>${fmt(p.buying_price)}</td>
+          <td>${fmt(p.selling_price)}</td>
+          <td><span class="badge ${stockBadge}">${fmtNum(p.current_stock)}</span></td>
+          <td style="color:#6b7280">${fmtNum(p.reorder_level)}</td>
+          <td>${p.expiry_date?'<span class="badge badge-orange">'+fmtDate(p.expiry_date)+'</span>':'—'}</td>
+          <td><button class="btn btn-sm" onclick="editProduct(${p.id})"><i class="fa-solid fa-pen"></i></button>
+              <button class="btn btn-sm btn-red" onclick="deactivateProduct(${p.id})"><i class="fa-solid fa-trash"></i></button></td>
+        </tr>`;
+      }).join('') || '<tr><td colspan="10" style="text-align:center;color:#6b7280;padding:20px">No products yet</td></tr>';
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('search-products').value.toLowerCase();
+      const cat = document.getElementById('filter-product-cat').value;
+      const lvl = document.getElementById('filter-product-stock').value;
+      let filtered = state.products.filter(p => {
+        const matchQ = !q || p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q);
+        const matchCat = !cat || String(p.category_id)===cat;
+        const matchLvl = !lvl || (lvl==='ok'&&parseFloat(p.current_stock)>parseFloat(p.reorder_level)) || (lvl==='low'&&parseFloat(p.current_stock)>0&&parseFloat(p.current_stock)<=parseFloat(p.reorder_level)) || (lvl==='out'&&parseFloat(p.current_stock)===0);
+        return matchQ&&matchCat&&matchLvl;
+      });
+      renderProducts(filtered);
+    }
+
+    async function saveProduct() {
+      const editId = document.getElementById('product-edit-id').value;
+      const body = {
+        name: document.getElementById('p-name').value.trim(),
+        sku: document.getElementById('p-sku').value.trim(),
+        barcode: document.getElementById('p-barcode').value.trim(),
+        category_id: document.getElementById('p-category').value||null,
+        unit: document.getElementById('p-unit').value,
+        buying_price: parseFloat(document.getElementById('p-buy').value)||0,
+        selling_price: parseFloat(document.getElementById('p-sell').value)||0,
+        reorder_level: parseFloat(document.getElementById('p-reorder').value)||10,
+        expiry_date: document.getElementById('p-expiry').value||null
+      };
+      if (!body.name) return showAlert('alert-product','Product name is required');
+      try {
+        if (editId) { await api('/products/'+editId,'PUT',body); showAlert('alert-product','Product updated','success'); }
+        else { await api('/products','POST',body); showAlert('alert-product','Product added','success'); }
+        cancelProductEdit();
+        await loadProducts();
+      } catch(e) { showAlert('alert-product',e.message); }
+    }
+
+    function editProduct(id) {
+      const p = state.products.find(x=>x.id===id);
+      if (!p) return;
+      document.getElementById('product-edit-id').value = id;
+      document.getElementById('p-name').value = p.name;
+      document.getElementById('p-sku').value = p.sku||'';
+      document.getElementById('p-barcode').value = p.barcode||'';
+      document.getElementById('p-category').value = p.category_id||'';
+      document.getElementById('p-unit').value = p.unit;
+      document.getElementById('p-buy').value = p.buying_price;
+      document.getElementById('p-sell').value = p.selling_price;
+      document.getElementById('p-reorder').value = p.reorder_level;
+      document.getElementById('p-expiry').value = p.expiry_date?p.expiry_date.split('T')[0]:'';
+      document.getElementById('product-form-title').innerHTML = '<i class="fa-solid fa-pen"></i> Edit Product';
+      document.getElementById('product-btn-label').textContent = 'Update Product';
+      document.getElementById('cancel-product-edit').style.display='inline-flex';
+      document.getElementById('product-form-card').scrollIntoView({behavior:'smooth'});
+    }
+
+    function cancelProductEdit() {
+      document.getElementById('product-edit-id').value='';
+      ['p-name','p-sku','p-barcode','p-expiry'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('p-category').value='';
+      document.getElementById('p-unit').value='pcs';
+      document.getElementById('p-buy').value='0';
+      document.getElementById('p-sell').value='0';
+      document.getElementById('p-reorder').value='10';
+      document.getElementById('product-form-title').innerHTML='<i class="fa-solid fa-plus"></i> Add Product';
+      document.getElementById('product-btn-label').textContent='Save Product';
+      document.getElementById('cancel-product-edit').style.display='none';
+    }
+
+    async function deactivateProduct(id) {
+      if (!confirm('Remove this product? It will be hidden (not deleted).')) return;
+      await api('/products/'+id,'DELETE');
+      await loadProducts();
+    }
+
+    function exportProductsExcel() {
+      const ws = XLSX.utils.json_to_sheet(state.products.map(p=>({Name:p.name,SKU:p.sku,Category:p.category_name,Unit:p.unit,'Buy Price':p.buying_price,'Sell Price':p.selling_price,'Current Stock':p.current_stock,'Reorder Level':p.reorder_level,'Expiry Date':p.expiry_date||''})));
+      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Products');
+      XLSX.writeFile(wb,'products.xlsx');
+    }
+
+    // ── CATEGORIES ─────────────────────────────────────────────────────────────
+    async function loadCategories() {
+      await loadCategoriesData();
+      renderCategories();
+    }
+
+    function renderCategories() {
+      const tbody = document.getElementById('categories-table');
+      tbody.innerHTML = state.categories.map(c=>`
+        <tr><td><strong>${c.name}</strong></td><td style="color:#9ca3af">${c.description||'—'}</td>
+        <td><button class="btn btn-sm" onclick="openEditCategory(${c.id})"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn btn-sm btn-red" onclick="deleteCategory(${c.id})"><i class="fa-solid fa-trash"></i></button></td></tr>
+      `).join('') || '<tr><td colspan="3" style="text-align:center;color:#6b7280;padding:20px">No categories yet</td></tr>';
+    }
+
+    async function addCategory() {
+      const name = document.getElementById('cat-name').value.trim();
+      if (!name) return showAlert('alert-category','Category name required');
+      try {
+        await api('/categories','POST',{name,description:document.getElementById('cat-desc').value.trim()});
+        document.getElementById('cat-name').value=''; document.getElementById('cat-desc').value='';
+        showAlert('alert-category','Category added','success');
+        await loadCategories();
+      } catch(e) { showAlert('alert-category',e.message); }
+    }
+
+    function openEditCategory(id) {
+      const c = state.categories.find(x=>x.id===id);
+      if (!c) return;
+      document.getElementById('edit-cat-id').value=id;
+      document.getElementById('edit-cat-name').value=c.name;
+      document.getElementById('edit-cat-desc').value=c.description||'';
+      openModal('edit-cat-modal');
+    }
+
+    async function saveEditCategory() {
+      const id=document.getElementById('edit-cat-id').value;
+      const name=document.getElementById('edit-cat-name').value.trim();
+      if (!name) return;
+      await api('/categories/'+id,'PUT',{name,description:document.getElementById('edit-cat-desc').value});
+      closeModal('edit-cat-modal'); await loadCategories();
+    }
+
+    async function deleteCategory(id) {
+      if (!confirm('Delete this category?')) return;
+      await api('/categories/'+id,'DELETE'); await loadCategories();
+    }
+
+    // ── STOCK IN (GRN) ─────────────────────────────────────────────────────────
+    let grnRows = [];
+
+    async function loadGrns() {
+      state.grns = await api('/stock-in');
+      renderGrns(state.grns);
+      if (!document.getElementById('grn-items-body').children.length) addGrnRow();
+    }
+
+    function renderGrns(grns) {
+      const tbody = document.getElementById('grn-table');
+      const payBadge = {'paid':'badge-green','partial':'badge-yellow','unpaid':'badge-red'};
+      tbody.innerHTML = grns.map(g=>`
+        <tr><td><strong>${g.grn_number}</strong></td><td>${g.supplier_name||'—'}</td>
+        <td>${fmt(g.total_amount)}</td>
+        <td><span class="badge ${payBadge[g.payment_status]||'badge-gray'}">${g.payment_status}</span></td>
+        <td>${g.received_by_name||'—'}</td><td>${fmtDateTime(g.created_at)}</td>
+        <td><button class="btn btn-sm btn-blue" onclick="viewGrn(${g.id})"><i class="fa-solid fa-eye"></i> View</button></td></tr>
+      `).join('') || '<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:20px">No GRNs yet</td></tr>';
+    }
+
+    function filterGrn() {
+      const q=document.getElementById('search-grn').value.toLowerCase();
+      renderGrns(state.grns.filter(g=>g.grn_number.toLowerCase().includes(q)||(g.supplier_name||'').toLowerCase().includes(q)));
+    }
+
+    function addGrnRow() {
+      const tbody = document.getElementById('grn-items-body');
+      const tr = document.createElement('tr');
+      const productOpts = state.products.map(p=>`<option value="${p.id}" data-buy="${p.buying_price}">${p.name}</option>`).join('');
+      tr.innerHTML = `
+        <td><select class="product-select" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px 8px;color:#fff" onchange="grnAutoPrice(this)">${productOpts}</select></td>
+        <td><input type="number" min="0.01" step="0.01" value="1" style="width:90px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="calcGrnTotal()"></td>
+        <td><input type="number" min="0" step="0.01" value="0" style="width:110px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="calcGrnTotal()"></td>
+        <td><input type="date" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:5px 8px;color:#fff"></td>
+        <td><button class="btn btn-sm btn-red" onclick="this.closest('tr').remove();calcGrnTotal()"><i class="fa-solid fa-xmark"></i></button></td>`;
+      tbody.appendChild(tr);
+      if (tr.querySelector('select')) {
+        const sel = tr.querySelector('select');
+        const firstOpt = sel.options[0];
+        if (firstOpt) {
+          const buyPrice = firstOpt.dataset.buy||0;
+          tr.querySelectorAll('input')[1].value = buyPrice;
+        }
+      }
+      calcGrnTotal();
+    }
+
+    function grnAutoPrice(sel) {
+      const opt = sel.options[sel.selectedIndex];
+      const row = sel.closest('tr');
+      row.querySelectorAll('input')[1].value = opt.dataset.buy||0;
+      calcGrnTotal();
+    }
+
+    function calcGrnTotal() {
+      let total=0;
+      document.querySelectorAll('#grn-items-body tr').forEach(tr=>{
+        const inputs=tr.querySelectorAll('input');
+        if(inputs.length>=2) total+=(parseFloat(inputs[0].value)||0)*(parseFloat(inputs[1].value)||0);
+      });
+      document.getElementById('grn-total').textContent='KES '+fmtNum(total);
+    }
+
+    async function saveGrn() {
+      const rows=document.querySelectorAll('#grn-items-body tr');
+      const items=[];
+      rows.forEach(tr=>{
+        const sel=tr.querySelector('select');
+        const inputs=tr.querySelectorAll('input');
+        if(sel&&inputs.length>=2&&parseFloat(inputs[0].value)>0){
+          items.push({product_id:parseInt(sel.value),quantity:parseFloat(inputs[0].value),buying_price:parseFloat(inputs[1].value)||0,expiry_date:inputs[2]&&inputs[2].value?inputs[2].value:null});
+        }
+      });
+      if(!items.length) return showAlert('alert-grn','Add at least one item');
+      const body={supplier_id:document.getElementById('grn-supplier').value||null,grn_number:document.getElementById('grn-number').value.trim()||null,payment_status:document.getElementById('grn-payment').value,notes:document.getElementById('grn-notes').value.trim(),items};
+      try {
+        await api('/stock-in','POST',body);
+        showAlert('alert-grn','GRN saved and stock updated','success');
+        document.getElementById('grn-number').value='';
+        document.getElementById('grn-notes').value='';
+        document.getElementById('grn-items-body').innerHTML='';
+        document.getElementById('grn-total').textContent='KES 0.00';
+        addGrnRow();
+        await Promise.all([loadGrns(), loadProductsData()]);
+      } catch(e){showAlert('alert-grn',e.message);}
+    }
+
+    async function viewGrn(id) {
+      const g=await api('/stock-in/'+id);
+      document.getElementById('grn-detail-content').innerHTML=`
+        <div style="font-size:0.85em;color:#9ca3af;margin-bottom:14px">
+          <strong style="color:#fff">${g.grn_number}</strong> &nbsp;|&nbsp; Supplier: ${g.supplier_name||'Unknown'} &nbsp;|&nbsp; ${fmtDateTime(g.created_at)}<br>
+          Received by: ${g.received_by_name||'—'} &nbsp;|&nbsp; Payment: <span class="badge badge-${g.payment_status==='paid'?'green':g.payment_status==='partial'?'yellow':'red'}">${g.payment_status}</span>
+        </div>
+        <table><thead><tr><th>Product</th><th>Unit</th><th>Qty</th><th>Buy Price (KES)</th><th>Subtotal (KES)</th></tr></thead>
+        <tbody>${(g.items||[]).map(i=>`<tr><td>${i.product_name}</td><td>${i.unit}</td><td>${fmtNum(i.quantity)}</td><td>${fmt(i.buying_price)}</td><td>${fmt(parseFloat(i.quantity)*parseFloat(i.buying_price))}</td></tr>`).join('')}</tbody></table>
+        <div style="text-align:right;margin-top:12px;font-weight:600">Total: ${fmt(g.total_amount)}</div>`;
+      openModal('grn-detail-modal');
+    }
+
+    function exportGrnExcel() {
+      const ws=XLSX.utils.json_to_sheet(state.grns.map(g=>({'GRN#':g.grn_number,Supplier:g.supplier_name||'—','Total (KES)':g.total_amount,Payment:g.payment_status,'Received By':g.received_by_name||'—',Date:fmtDateTime(g.created_at)})));
+      const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'GRNs');
+      XLSX.writeFile(wb,'grn-history.xlsx');
+    }
+
+    // ── SALES (POS) ────────────────────────────────────────────────────────────
+    let cart=[];
+
+    async function loadSalesPage() {
+      state.sales = await api('/sales');
+      renderSales(state.sales);
+      await loadCustomersData();
+    }
+
+    function renderSales(sales) {
+      const tbody=document.getElementById('sales-table');
+      const methodBadge={'cash':'badge-green','mpesa':'badge-blue','bank':'badge-orange','credit':'badge-red'};
+      tbody.innerHTML=sales.map(s=>`
+        <tr><td><strong>${s.invoice_number}</strong></td><td>${s.customer_name||'Walk-in'}</td>
+        <td>${fmt(s.total_amount)}</td>
+        <td><span class="badge ${methodBadge[s.payment_method]||'badge-gray'}">${s.payment_method}</span></td>
+        <td><span class="badge badge-${s.payment_status==='paid'?'green':'yellow'}">${s.payment_status}</span></td>
+        <td>${s.served_by_name||'—'}</td><td>${fmtDateTime(s.created_at)}</td>
+        <td><button class="btn btn-sm btn-blue" onclick="viewSale(${s.id})"><i class="fa-solid fa-eye"></i></button></td></tr>
+      `).join('')||'<tr><td colspan="8" style="text-align:center;color:#6b7280;padding:20px">No sales yet</td></tr>';
+    }
+
+    function filterSales() {
+      const q=document.getElementById('search-sales').value.toLowerCase();
+      const m=document.getElementById('filter-sale-method').value;
+      renderSales(state.sales.filter(s=>(!q||(s.invoice_number||'').toLowerCase().includes(q)||(s.customer_name||'').toLowerCase().includes(q))&&(!m||s.payment_method===m)));
+    }
+
+    function posSearch() {
+      const q=document.getElementById('pos-search').value.toLowerCase();
+      const res=document.getElementById('pos-results');
+      if(!q){res.innerHTML='';return;}
+      const matches=state.products.filter(p=>p.name.toLowerCase().includes(q)&&parseFloat(p.current_stock)>0);
+      if(!matches.length){res.innerHTML='<p style="color:#6b7280;font-size:0.83em;padding:8px">No products found</p>';return;}
+      res.innerHTML=matches.map(p=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid rgba(255,255,255,0.07);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''" onclick="addToCart(${p.id})">
+          <div><div style="font-size:0.88em;color:#fff">${p.name}</div><div style="font-size:0.75em;color:#6b7280">${fmtNum(p.current_stock)} ${p.unit} available</div></div>
+          <div style="text-align:right"><div style="font-size:0.88em;color:#10b981;font-weight:600">${fmt(p.selling_price)}</div><div style="font-size:0.72em;color:#6b7280">per ${p.unit}</div></div>
+        </div>`).join('');
+    }
+
+    function addToCart(productId) {
+      const p=state.products.find(x=>x.id===productId);
+      if(!p) return;
+      const existing=cart.find(c=>c.product_id===productId);
+      if(existing) {existing.qty++;} else {cart.push({product_id:p.id,name:p.name,unit:p.unit,unit_price:parseFloat(p.selling_price),qty:1,max_stock:parseFloat(p.current_stock)});}
+      renderCart();
+      document.getElementById('pos-search').value='';
+      document.getElementById('pos-results').innerHTML='';
+    }
+
+    function renderCart() {
+      const tbody=document.getElementById('cart-body');
+      tbody.innerHTML=cart.map((item,i)=>`
+        <tr>
+          <td><strong>${item.name}</strong><br><span style="font-size:0.75em;color:#6b7280">${item.unit}</span></td>
+          <td><input type="number" value="${item.unit_price}" min="0" step="0.01" style="width:100px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff;text-align:right" onchange="updateCartPrice(${i},this.value)"></td>
+          <td><input type="number" value="${item.qty}" min="1" max="${item.max_stock}" step="1" style="width:70px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff;text-align:center" onchange="updateCartQty(${i},this.value)"></td>
+          <td style="color:#10b981;font-weight:600">${fmt(item.unit_price*item.qty)}</td>
+          <td><button class="btn btn-sm btn-red" onclick="removeFromCart(${i})"><i class="fa-solid fa-xmark"></i></button></td>
+        </tr>`).join('')||'<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:16px">Cart is empty — search for products above</td></tr>';
+      const total=cart.reduce((s,i)=>s+(i.unit_price*i.qty),0);
+      document.getElementById('cart-total').textContent=fmt(total);
+      document.getElementById('checkout-total').textContent=fmt(total);
+    }
+
+    function updateCartQty(i,v){cart[i].qty=Math.max(1,parseFloat(v)||1);renderCart();}
+    function updateCartPrice(i,v){cart[i].unit_price=parseFloat(v)||0;renderCart();}
+    function removeFromCart(i){cart.splice(i,1);renderCart();}
+
+    async function completeSale() {
+      if(!cart.length) return showAlert('alert-sale','Cart is empty');
+      const body={customer_id:document.getElementById('sale-customer').value||null,payment_method:document.getElementById('sale-method').value,payment_status:document.getElementById('sale-method').value==='credit'?'unpaid':'paid',notes:document.getElementById('sale-notes').value,items:cart.map(c=>({product_id:c.product_id,quantity:c.qty,unit_price:c.unit_price}))};
+      try {
+        const sale=await api('/sales','POST',body);
+        showReceipt(sale, cart);
+        cart=[];renderCart();
+        document.getElementById('sale-customer').value='';
+        document.getElementById('sale-notes').value='';
+        await Promise.all([loadSalesPage(), loadProductsData()]);
+      } catch(e){showAlert('alert-sale',e.message);}
+    }
+
+    function showReceipt(sale, items) {
+      const total=items.reduce((s,i)=>s+(i.unit_price*i.qty),0);
+      document.getElementById('receipt-content').innerHTML=`
+        <div style="font-family:monospace;font-size:0.85em;line-height:1.8">
+          <div style="text-align:center;margin-bottom:12px"><strong style="font-size:1.1em">HappywiseGhala</strong><br><span style="color:#6b7280">Stock & Inventory Manager</span></div>
+          <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.2);margin:8px 0">
+          <div>Invoice: <strong>${sale.invoice_number}</strong></div>
+          <div>Date: ${fmtDateTime(sale.created_at)}</div>
+          <div>Method: ${sale.payment_method}</div>
+          <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.2);margin:8px 0">
+          ${items.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.name} x${i.qty}</span><span>${fmt(i.unit_price*i.qty)}</span></div>`).join('')}
+          <hr style="border:none;border-top:1px dashed rgba(255,255,255,0.2);margin:8px 0">
+          <div style="display:flex;justify-content:space-between;font-size:1.1em;font-weight:700"><span>TOTAL</span><span style="color:#10b981">${fmt(total)}</span></div>
+        </div>`;
+      openModal('receipt-modal');
+    }
+
+    function printReceipt() { window.print(); }
+
+    async function viewSale(id) {
+      const s=await api('/sales/'+id);
+      const items=s.items||[];
+      document.getElementById('sale-detail-content').innerHTML=`
+        <div style="font-size:0.83em;color:#9ca3af;margin-bottom:14px">
+          Invoice: <strong style="color:#fff">${s.invoice_number}</strong> &nbsp;|&nbsp; Customer: ${s.customer_name||'Walk-in'}<br>
+          Date: ${fmtDateTime(s.created_at)} &nbsp;|&nbsp; Method: ${s.payment_method} &nbsp;|&nbsp; Status: <span class="badge badge-${s.payment_status==='paid'?'green':'yellow'}">${s.payment_status}</span>
+        </div>
+        <table><thead><tr><th>Product</th><th>Unit</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+        <tbody>${items.map(i=>`<tr><td>${i.product_name}</td><td>${i.unit}</td><td>${fmtNum(i.quantity)}</td><td>${fmt(i.unit_price)}</td><td>${fmt(i.total)}</td></tr>`).join('')}</tbody></table>
+        <div style="text-align:right;margin-top:12px;font-weight:600">Total: ${fmt(s.total_amount)}</div>`;
+      openModal('sale-detail-modal');
+    }
+
+    function exportSalesExcel() {
+      const ws=XLSX.utils.json_to_sheet(state.sales.map(s=>({'Invoice':s.invoice_number,'Customer':s.customer_name||'Walk-in','Total (KES)':s.total_amount,'Method':s.payment_method,'Status':s.payment_status,'Served By':s.served_by_name||'—','Date':fmtDateTime(s.created_at)})));
+      const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sales');
+      XLSX.writeFile(wb,'sales.xlsx');
+    }
+
+    // ── ADJUSTMENTS ────────────────────────────────────────────────────────────
+    async function loadAdjustments() {
+      state.adjustments=await api('/adjustments');
+      renderAdj(state.adjustments);
+    }
+
+    function renderAdj(adjs) {
+      const tbody=document.getElementById('adj-table');
+      const typeLabel={'damage':'Damage','expiry':'Expiry','return_out':'Return Out','return_in':'Return In','stock_take_deficit':'Stock Take Deficit','stock_take_surplus':'Stock Take Surplus'};
+      tbody.innerHTML=adjs.map(a=>`
+        <tr><td>${a.product_name}</td>
+        <td><span class="badge badge-${parseFloat(a.stock_change)>0?'green':'red'}">${typeLabel[a.type]||a.type}</span></td>
+        <td>${fmtNum(a.quantity)}</td>
+        <td class="${parseFloat(a.stock_change)>0?'stock-ok':'stock-critical'}">${parseFloat(a.stock_change)>0?'+':''}${fmtNum(a.stock_change)}</td>
+        <td style="color:#9ca3af">${a.reason||'—'}</td>
+        <td>${a.adjusted_by_name||'—'}</td>
+        <td>${fmtDateTime(a.created_at)}</td></tr>
+      `).join('')||'<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:20px">No adjustments yet</td></tr>';
+    }
+
+    function filterAdj() {
+      const q=document.getElementById('search-adj').value.toLowerCase();
+      const t=document.getElementById('filter-adj-type').value;
+      renderAdj(state.adjustments.filter(a=>(!q||(a.product_name||'').toLowerCase().includes(q))&&(!t||a.type===t)));
+    }
+
+    async function saveAdjustment() {
+      const body={product_id:document.getElementById('adj-product').value,type:document.getElementById('adj-type').value,quantity:parseFloat(document.getElementById('adj-qty').value)||0,reason:document.getElementById('adj-reason').value.trim()};
+      if(!body.product_id) return showAlert('alert-adj','Select a product');
+      if(body.quantity<=0) return showAlert('alert-adj','Quantity must be greater than 0');
+      if(!body.reason) return showAlert('alert-adj','Reason is required');
+      try {
+        await api('/adjustments','POST',body);
+        showAlert('alert-adj','Adjustment saved','success');
+        document.getElementById('adj-qty').value='';
+        document.getElementById('adj-reason').value='';
+        await Promise.all([loadAdjustments(), loadProductsData()]);
+      } catch(e){showAlert('alert-adj',e.message);}
+    }
+
+    document.addEventListener('DOMContentLoaded',()=>{
+      const adjType=document.getElementById('adj-type');
+      if(adjType) adjType.addEventListener('change',()=>{
+        const increases=['stock_take_surplus','return_in'];
+        const t=adjType.value;
+        const hint=document.getElementById('adj-direction-hint');
+        hint.textContent=increases.includes(t)?'↑ This will INCREASE stock':'↓ This will DECREASE stock';
+        hint.style.color=increases.includes(t)?'#10b981':'#f87171';
+      });
+    });
+
+    // ── SUPPLIERS ──────────────────────────────────────────────────────────────
+    async function loadSuppliers() {
+      await loadSuppliersData();
+      renderSuppliers(state.suppliers);
+    }
+
+    function renderSuppliers(sups) {
+      const tbody=document.getElementById('suppliers-table');
+      tbody.innerHTML=sups.map(s=>`
+        <tr><td><strong>${s.name}</strong></td><td>${s.phone||'—'}</td><td>${s.email||'—'}</td>
+        <td style="color:#9ca3af">${s.address||'—'}</td>
+        <td><button class="btn btn-sm" onclick="openEditSupplier(${s.id})"><i class="fa-solid fa-pen"></i></button></td></tr>
+      `).join('')||'<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:20px">No suppliers yet</td></tr>';
+    }
+
+    function filterSuppliers(){const q=document.getElementById('search-suppliers').value.toLowerCase();renderSuppliers(state.suppliers.filter(s=>s.name.toLowerCase().includes(q)||(s.phone||'').includes(q)));}
+
+    async function addSupplier() {
+      const name=document.getElementById('sup-name').value.trim();
+      if(!name) return showAlert('alert-supplier','Supplier name required');
+      try {
+        await api('/suppliers','POST',{name,phone:document.getElementById('sup-phone').value,email:document.getElementById('sup-email').value,address:document.getElementById('sup-address').value,notes:document.getElementById('sup-notes').value});
+        showAlert('alert-supplier','Supplier added','success');
+        ['sup-name','sup-phone','sup-email','sup-address','sup-notes'].forEach(id=>document.getElementById(id).value='');
+        await loadSuppliers();
+      } catch(e){showAlert('alert-supplier',e.message);}
+    }
+
+    function openEditSupplier(id){
+      const s=state.suppliers.find(x=>x.id===id); if(!s) return;
+      document.getElementById('edit-sup-id').value=id;
+      document.getElementById('edit-sup-name').value=s.name;
+      document.getElementById('edit-sup-phone').value=s.phone||'';
+      document.getElementById('edit-sup-email').value=s.email||'';
+      document.getElementById('edit-sup-address').value=s.address||'';
+      document.getElementById('edit-sup-notes').value=s.notes||'';
+      openModal('edit-sup-modal');
+    }
+
+    async function saveEditSupplier(){
+      const id=document.getElementById('edit-sup-id').value;
+      await api('/suppliers/'+id,'PUT',{name:document.getElementById('edit-sup-name').value,phone:document.getElementById('edit-sup-phone').value,email:document.getElementById('edit-sup-email').value,address:document.getElementById('edit-sup-address').value,notes:document.getElementById('edit-sup-notes').value});
+      closeModal('edit-sup-modal'); await loadSuppliers();
+    }
+
+    // ── CUSTOMERS ──────────────────────────────────────────────────────────────
+    async function loadCustomers(){
+      await loadCustomersData();
+      renderCustomers(state.customers);
+    }
+
+    function renderCustomers(custs){
+      const tbody=document.getElementById('customers-table');
+      tbody.innerHTML=custs.map(c=>`
+        <tr><td><strong>${c.name}</strong></td><td>${c.phone||'—'}</td><td>${c.email||'—'}</td>
+        <td>${fmt(c.credit_limit)}</td>
+        <td><button class="btn btn-sm" onclick="openEditCustomer(${c.id})"><i class="fa-solid fa-pen"></i></button></td></tr>
+      `).join('')||'<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:20px">No customers yet</td></tr>';
+    }
+
+    function filterCustomers(){const q=document.getElementById('search-customers').value.toLowerCase();renderCustomers(state.customers.filter(c=>c.name.toLowerCase().includes(q)||(c.phone||'').includes(q)));}
+
+    async function addCustomer(){
+      const name=document.getElementById('cust-name').value.trim();
+      if(!name) return showAlert('alert-customer','Customer name required');
+      try {
+        await api('/customers','POST',{name,phone:document.getElementById('cust-phone').value,email:document.getElementById('cust-email').value,credit_limit:parseFloat(document.getElementById('cust-limit').value)||0,notes:document.getElementById('cust-notes').value});
+        showAlert('alert-customer','Customer added','success');
+        ['cust-name','cust-phone','cust-email','cust-notes'].forEach(id=>document.getElementById(id).value='');
+        document.getElementById('cust-limit').value='0';
+        await loadCustomers();
+      } catch(e){showAlert('alert-customer',e.message);}
+    }
+
+    function openEditCustomer(id){
+      const c=state.customers.find(x=>x.id===id); if(!c) return;
+      document.getElementById('edit-cust-id').value=id;
+      document.getElementById('edit-cust-name').value=c.name;
+      document.getElementById('edit-cust-phone').value=c.phone||'';
+      document.getElementById('edit-cust-email').value=c.email||'';
+      document.getElementById('edit-cust-limit').value=c.credit_limit||0;
+      document.getElementById('edit-cust-notes').value=c.notes||'';
+      openModal('edit-cust-modal');
+    }
+
+    async function saveEditCustomer(){
+      const id=document.getElementById('edit-cust-id').value;
+      await api('/customers/'+id,'PUT',{name:document.getElementById('edit-cust-name').value,phone:document.getElementById('edit-cust-phone').value,email:document.getElementById('edit-cust-email').value,credit_limit:parseFloat(document.getElementById('edit-cust-limit').value)||0,notes:document.getElementById('edit-cust-notes').value});
+      closeModal('edit-cust-modal'); await loadCustomers();
+    }
+
+    // ── REPORTS ────────────────────────────────────────────────────────────────
+    function showReport(type) {
+      document.querySelectorAll('.report-section').forEach(s=>s.style.display='none');
+      const el=document.getElementById('report-'+type);
+      if(el) el.style.display='block';
+      state.currentReport=type;
+      const needsDates=['sales','purchases','profit'];
+      const dateFilter=document.getElementById('report-date-filter');
+      const slowSel=document.getElementById('slow-days');
+      dateFilter.style.display=needsDates.includes(type)||type==='slowmoving'?'flex':'none';
+      if(slowSel) slowSel.style.display=type==='slowmoving'?'block':'none';
+      if(!document.getElementById('rep-from').value){
+        const now=new Date();
+        document.getElementById('rep-from').value=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+        document.getElementById('rep-to').value=now.toISOString().split('T')[0];
+      }
+      loadCurrentReport();
+    }
+
+    function loadCurrentReport(){
+      const t=state.currentReport;
+      if(t==='valuation') loadValuation();
+      else if(t==='sales') loadSalesReport();
+      else if(t==='purchases') loadPurchasesReport();
+      else if(t==='profit') loadProfitReport();
+      else if(t==='slowmoving') loadSlowMoving();
+    }
+
+    async function loadValuation(){
+      const d=await api('/reports/valuation');
+      document.getElementById('val-total-cost').textContent=fmt(d.totals.total_cost);
+      document.getElementById('val-total-retail').textContent=fmt(d.totals.total_retail);
+      document.getElementById('val-potential').textContent=fmt(parseFloat(d.totals.total_retail)-parseFloat(d.totals.total_cost));
+      document.getElementById('val-table').innerHTML=d.items.map(r=>`
+        <tr><td>${r.name}</td><td style="color:#9ca3af">${r.sku||'—'}</td><td>${r.category_name||'—'}</td><td>${r.unit}</td>
+        <td>${fmtNum(r.current_stock)}</td><td>${fmt(r.buying_price)}</td><td>${fmt(r.selling_price)}</td>
+        <td style="color:#fbbf24">${fmt(r.cost_value)}</td><td style="color:#60a5fa">${fmt(r.retail_value)}</td></tr>`).join('');
+    }
+
+    async function loadSalesReport(){
+      const d=await api(`/reports/sales?from=${document.getElementById('rep-from').value}&to=${document.getElementById('rep-to').value}`);
+      document.getElementById('rep-sales-total').textContent=fmt(d.summary.total);
+      document.getElementById('rep-sales-count').textContent=d.summary.count;
+      document.getElementById('rep-sales-table').innerHTML=d.sales.map(s=>`
+        <tr><td>${s.invoice_number}</td><td>${s.customer_name}</td><td>${fmt(s.total_amount)}</td>
+        <td>${s.payment_method}</td><td><span class="badge badge-${s.payment_status==='paid'?'green':'yellow'}">${s.payment_status}</span></td>
+        <td>${s.served_by_name||'—'}</td><td>${fmtDateTime(s.created_at)}</td></tr>`).join('');
+    }
+
+    async function loadPurchasesReport(){
+      const d=await api(`/reports/purchases?from=${document.getElementById('rep-from').value}&to=${document.getElementById('rep-to').value}`);
+      document.getElementById('rep-pur-total').textContent=fmt(d.summary.total);
+      document.getElementById('rep-pur-count').textContent=d.summary.count;
+      document.getElementById('rep-pur-table').innerHTML=d.purchases.map(p=>`
+        <tr><td>${p.grn_number}</td><td>${p.supplier_name}</td><td>${fmt(p.total_amount)}</td>
+        <td><span class="badge badge-${p.payment_status==='paid'?'green':p.payment_status==='partial'?'yellow':'red'}">${p.payment_status}</span></td>
+        <td>${p.received_by_name||'—'}</td><td>${fmtDateTime(p.created_at)}</td></tr>`).join('');
+    }
+
+    async function loadProfitReport(){
+      const d=await api(`/reports/profit?from=${document.getElementById('rep-from').value}&to=${document.getElementById('rep-to').value}`);
+      document.getElementById('rep-profit-table').innerHTML=d.map(r=>{
+        const margin=r.revenue>0?((r.profit/r.revenue)*100).toFixed(1):0;
+        return `<tr><td>${r.name}</td><td>${r.unit}</td><td>${fmtNum(r.qty_sold)}</td>
+          <td style="color:#60a5fa">${fmt(r.revenue)}</td><td style="color:#fb923c">${fmt(r.cost)}</td>
+          <td class="${parseFloat(r.profit)>=0?'stock-ok':'stock-critical'}">${fmt(r.profit)}</td>
+          <td class="${parseFloat(margin)>=20?'stock-ok':parseFloat(margin)>=10?'stock-low':'stock-critical'}">${margin}%</td></tr>`;
+      }).join('');
+    }
+
+    async function loadSlowMoving(){
+      const days=document.getElementById('slow-days').value||30;
+      const d=await api('/reports/slow-moving?days='+days);
+      document.getElementById('rep-slow-table').innerHTML=d.map(r=>`
+        <tr><td>${r.name}</td><td>${r.category_name||'—'}</td><td>${r.unit}</td>
+        <td>${fmtNum(r.current_stock)}</td><td style="color:#fbbf24">${fmt(r.tied_value)}</td>
+        <td style="color:#9ca3af">${r.last_sale_date?fmtDateTime(r.last_sale_date):'Never sold'}</td></tr>`).join('');
+    }
+
+    function exportValuationExcel(){api('/reports/valuation').then(d=>{const ws=XLSX.utils.json_to_sheet(d.items.map(r=>({Name:r.name,SKU:r.sku,Category:r.category_name,Unit:r.unit,Stock:r.current_stock,'Buy Price':r.buying_price,'Sell Price':r.selling_price,'Cost Value':r.cost_value,'Retail Value':r.retail_value})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Valuation');XLSX.writeFile(wb,'stock-valuation.xlsx');});}
+    function exportSalesReportExcel(){const ws=XLSX.utils.json_to_sheet(state.sales.map(s=>({Invoice:s.invoice_number,Customer:s.customer_name||'Walk-in','Total (KES)':s.total_amount,Method:s.payment_method,Status:s.payment_status,Date:fmtDateTime(s.created_at)})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Sales');XLSX.writeFile(wb,'sales-report.xlsx');}
+    function exportPurchasesExcel(){const ws=XLSX.utils.json_to_sheet(state.grns.map(g=>({'GRN#':g.grn_number,Supplier:g.supplier_name||'—','Total (KES)':g.total_amount,Payment:g.payment_status,Date:fmtDateTime(g.created_at)})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Purchases');XLSX.writeFile(wb,'purchases-report.xlsx');}
+    function exportProfitExcel(){document.getElementById('rep-profit-table')&&api(`/reports/profit?from=${document.getElementById('rep-from').value}&to=${document.getElementById('rep-to').value}`).then(d=>{const ws=XLSX.utils.json_to_sheet(d.map(r=>({Product:r.name,Unit:r.unit,'Qty Sold':r.qty_sold,'Revenue (KES)':r.revenue,'Cost (KES)':r.cost,'Profit (KES)':r.profit})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Profit');XLSX.writeFile(wb,'profit-report.xlsx');});}
+    function exportSlowExcel(){api('/reports/slow-moving?days='+(document.getElementById('slow-days').value||30)).then(d=>{const ws=XLSX.utils.json_to_sheet(d.map(r=>({Product:r.name,Category:r.category_name,Unit:r.unit,Stock:r.current_stock,'Tied Value (KES)':r.tied_value,'Last Sale':r.last_sale_date?fmtDateTime(r.last_sale_date):'Never'})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'SlowMoving');XLSX.writeFile(wb,'slow-moving.xlsx');});}
+
+    // ── STAFF ──────────────────────────────────────────────────────────────────
+    async function loadStaff(){
+      state.staff=await api('/staff').catch(()=>[]);
+      const tbody=document.getElementById('staff-table');
+      tbody.innerHTML=state.staff.map(s=>`
+        <tr><td><strong>${s.name}</strong></td><td style="color:#9ca3af">${s.username}</td>
+        <td><span class="badge badge-${s.role==='owner'?'green':s.role==='manager'?'blue':'gray'}">${s.role}</span></td>
+        <td><span class="badge badge-${s.is_active?'green':'red'}">${s.is_active?'Active':'Inactive'}</span></td>
+        <td>${fmtDate(s.created_at)}</td>
+        <td><button class="btn btn-sm" onclick="openResetPwd(${s.id},'${s.name}')"><i class="fa-solid fa-key"></i></button>
+            <button class="btn btn-sm btn-${s.is_active?'red':'green'}" onclick="toggleStaff(${s.id},${!s.is_active},'${s.role}')"><i class="fa-solid fa-${s.is_active?'ban':'circle-check'}"></i></button></td></tr>
+      `).join('');
+    }
+
+    async function addStaff(){
+      const body={name:document.getElementById('staff-name').value.trim(),username:document.getElementById('staff-username').value.trim(),password:document.getElementById('staff-password').value,role:document.getElementById('staff-role').value};
+      if(!body.name||!body.username||!body.password) return showAlert('alert-staff','All fields required');
+      try{await api('/staff','POST',body);showAlert('alert-staff','Staff added','success');['staff-name','staff-username','staff-password'].forEach(id=>document.getElementById(id).value='');await loadStaff();}
+      catch(e){showAlert('alert-staff',e.message);}
+    }
+
+    async function toggleStaff(id,isActive,role){
+      await api('/staff/'+id,'PUT',{role,is_active:isActive}); await loadStaff();
+    }
+
+    function openResetPwd(id,name){
+      state.resetPwdStaffId=id;
+      document.getElementById('reset-pwd-name').textContent='Resetting password for: '+name;
+      document.getElementById('reset-pwd-input').value='';
+      openModal('reset-pwd-modal');
+    }
+
+    async function confirmResetPassword(){
+      const pw=document.getElementById('reset-pwd-input').value;
+      if(!pw) return;
+      await api('/staff/'+state.resetPwdStaffId+'/reset-password','POST',{password:pw});
+      closeModal('reset-pwd-modal');
+    }
+
+    // ── AUDIT LOG ──────────────────────────────────────────────────────────────
+    async function loadAudit(){
+      state.audit=await api('/audit-log').catch(()=>[]);
+      renderAudit(state.audit);
+    }
+
+    function renderAudit(logs){
+      const tbody=document.getElementById('audit-table');
+      tbody.innerHTML=logs.map(l=>`
+        <tr><td style="white-space:nowrap">${fmtDateTime(l.created_at)}</td>
+        <td><span class="badge badge-blue">${l.action.replace(/_/g,' ')}</span></td>
+        <td style="color:#9ca3af;max-width:300px;word-break:break-word">${l.details||'—'}</td>
+        <td>${l.performed_by_name||'System'}</td></tr>
+      `).join('')||'<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:20px">No activity yet</td></tr>';
+    }
+
+    function filterAudit(){const q=document.getElementById('search-audit').value.toLowerCase();renderAudit(state.audit.filter(l=>(l.action||'').toLowerCase().includes(q)||(l.details||'').toLowerCase().includes(q)||(l.performed_by_name||'').toLowerCase().includes(q)));}
+
+    // ── SETTINGS ───────────────────────────────────────────────────────────────
+    async function loadSettings(){
+      const cfg=await api('/config');
+      document.getElementById('cfg-name').value=cfg.business_name||'';
+      document.getElementById('cfg-currency').value=cfg.currency||'KES';
+      document.getElementById('cfg-neg-stock').value=cfg.allow_negative_stock||'false';
+    }
+
+    async function saveSettings(){
+      const body={business_name:document.getElementById('cfg-name').value,currency:document.getElementById('cfg-currency').value,allow_negative_stock:document.getElementById('cfg-neg-stock').value};
+      try{await api('/config','PUT',body);showAlert('alert-settings','Settings saved','success');}
+      catch(e){showAlert('alert-settings',e.message);}
+    }
+
+    // ── INIT ───────────────────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', async ()=>{
+      try {
+        const user=await api('/me');
+        document.getElementById('topbar-name').textContent=user.name;
+        document.getElementById('topbar-role').textContent=user.role;
+        document.getElementById('login-page').style.display='none';
+        document.getElementById('app-page').classList.add('show');
+        applyRoleVisibility(user.role);
+        await loadAll();
+        loadDashboard();
+      } catch(e) { /* not logged in, show login */ }
+    });

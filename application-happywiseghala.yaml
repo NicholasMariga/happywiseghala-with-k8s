@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myapp-happywiseghala
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/NicholasMariga/happywiseghala-with-k8s.git
+    targetRevision: HEAD
+    path: happywiseghala
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: happywiseghala
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    automated:
+      selfHeal: true
+      prune: true
