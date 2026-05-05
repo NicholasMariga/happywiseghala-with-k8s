@@ -3,3 +3,5 @@ __pycache__/
 .env
 *.log
 happywiseghala/database-secret.yaml
+start-app.bat
+stop-app.bat

@@ -62,7 +62,7 @@ data:
 
     function applyRoleVisibility(role) {
       const mgmtOnly = ['nav-staff','nav-audit','nav-settings'];
-      if (role==='storekeeper') {
+      if (role==='attendant') {
         mgmtOnly.forEach(c => { const el=document.querySelector('.'+c); if(el) el.style.display='none'; });
         document.getElementById('page-staff') && (document.getElementById('page-staff').style.display='none');
         document.getElementById('page-audit') && (document.getElementById('page-audit').style.display='none');
@@ -803,7 +803,7 @@ data:
       const tbody=document.getElementById('staff-table');
       tbody.innerHTML=state.staff.map(s=>`
         <tr><td><strong>${s.name}</strong></td><td style="color:#9ca3af">${s.username}</td>
-        <td><span class="badge badge-${s.role==='owner'?'green':s.role==='manager'?'blue':'gray'}">${s.role}</span></td>
+        <td><span class="badge badge-${s.role==='owner'?'green':s.role==='manager'?'blue':'gray'}">${s.role==='attendant'?'HappyWise Attendant':s.role}</span></td>
         <td><span class="badge badge-${s.is_active?'green':'red'}">${s.is_active?'Active':'Inactive'}</span></td>
         <td>${fmtDate(s.created_at)}</td>
         <td><button class="btn btn-sm" onclick="openResetPwd(${s.id},'${s.name}')"><i class="fa-solid fa-key"></i></button>

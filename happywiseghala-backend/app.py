@@ -36,7 +36,7 @@ def init_db():
         name VARCHAR(200) NOT NULL,
         username VARCHAR(100) UNIQUE NOT NULL,
         password_hash VARCHAR(64) NOT NULL,
-        role VARCHAR(50) NOT NULL DEFAULT 'storekeeper',
+        role VARCHAR(50) NOT NULL DEFAULT 'attendant',
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT NOW()
     )""")
@@ -172,10 +172,12 @@ def init_db():
 
     cur.execute("SELECT COUNT(*) FROM staff")
     if cur.fetchone()[0] == 0:
+        admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+        admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
         cur.execute("""
         INSERT INTO staff (name, username, password_hash, role)
-        VALUES ('Owner', 'admin', %s, 'owner')
-        """, (hash_pw('admin123'),))
+        VALUES ('Owner', %s, %s, 'owner')
+        """, (admin_username, hash_pw(admin_password)))
 
     conn.commit()
     cur.close()
@@ -523,7 +525,7 @@ def get_grn_detail(grn_id):
 @app.route('/stock-in', methods=['POST'])
 @login_required
 def create_grn():
-    if session.get('role') not in ('owner', 'manager', 'storekeeper'):
+    if session.get('role') not in ('owner', 'manager', 'attendant'):
         return jsonify({'error': 'Forbidden'}), 403
     data = request.json
     items = data.get('items', [])

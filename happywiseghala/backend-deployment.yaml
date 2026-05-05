@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: flask-backend
-        image: marigah/happywiseghala-backend:1.0
+        image: marigah/happywiseghala-backend:1.1
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
@@ -30,3 +30,13 @@ spec:
               key: POSTGRES_PASSWORD
         - name: POSTGRES_HOST
           value: postgres-service
+        - name: ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: ADMIN_USERNAME
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: ADMIN_PASSWORD

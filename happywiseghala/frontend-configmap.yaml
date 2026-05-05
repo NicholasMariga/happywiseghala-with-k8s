@@ -55,7 +55,7 @@ data:
         <div class="role-badges">
           <span class="role-badge"><i class="fa-solid fa-crown"></i> Owner</span>
           <span class="role-badge"><i class="fa-solid fa-user-tie"></i> Manager</span>
-          <span class="role-badge"><i class="fa-solid fa-boxes-stacked"></i> Storekeeper</span>
+          <span class="role-badge"><i class="fa-solid fa-boxes-stacked"></i> HappyWise Attendant</span>
         </div>
       </div>
     </div>
@@ -579,7 +579,7 @@ data:
                 <div class="form-group"><label>Password *</label><input type="password" id="staff-password" placeholder="Set password"></div>
                 <div class="form-group"><label>Role *</label>
                   <select id="staff-role">
-                    <option value="storekeeper">Storekeeper</option>
+                    <option value="attendant">HappyWise Attendant</option>
                     <option value="manager">Manager</option>
                   </select>
                 </div>
