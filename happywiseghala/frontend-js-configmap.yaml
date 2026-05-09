@@ -443,7 +443,7 @@ data:
       const fd = new FormData();
       fd.append('file', file);
       try {
-        const res = await fetch('/stock-in/scan-receipt', {method:'POST', body:fd});
+        const res = await fetch('/api/stock-in/scan-receipt', {method:'POST', body:fd});
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Scan failed');
         populateGrnFromScan(data.items);
