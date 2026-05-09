@@ -74,6 +74,19 @@ data:
     }
 
     // ── NAVIGATION ─────────────────────────────────────────────────────────────
+    function toggleSidebar() {
+      const s = document.querySelector('.sidebar'), o = document.getElementById('sidebar-overlay');
+      const isOpen = s.classList.toggle('open');
+      if (o) o.classList.toggle('open', isOpen);
+      document.body.style.overflow = isOpen ? 'hidden' : '';
+    }
+    function closeSidebar() {
+      const s = document.querySelector('.sidebar'), o = document.getElementById('sidebar-overlay');
+      if (s) s.classList.remove('open');
+      if (o) o.classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
     function showPage(name, event) {
       document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -81,6 +94,7 @@ data:
       if (pg) pg.classList.add('active');
       if (event && event.currentTarget) event.currentTarget.classList.add('active');
       else { document.querySelectorAll('.nav-item').forEach(n=>{ if(n.getAttribute('onclick')&&n.getAttribute('onclick').includes("'"+name+"'")) n.classList.add('active'); }); }
+      if (window.innerWidth <= 768) closeSidebar();
       const loaders = { dashboard:loadDashboard, products:loadProducts, categories:loadCategories, stockin:loadGrns, sales:loadSalesPage, adjustments:loadAdjustments, suppliers:loadSuppliers, customers:loadCustomers, staff:loadStaff, audit:loadAudit, settings:loadSettings };
       if (loaders[name]) loaders[name]();
     }
