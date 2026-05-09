@@ -744,6 +744,37 @@ data:
       </div>
     </div>
 
+    <!-- MODAL: Quick Add Product (from GRN scan) -->
+    <div class="modal" id="quick-add-product-modal">
+      <div class="modal-box" style="max-width:420px">
+        <span class="modal-close" onclick="closeModal('quick-add-product-modal')"><i class="fa-solid fa-xmark"></i></span>
+        <h3><i class="fa-solid fa-box"></i> Quick Add Product</h3>
+        <p style="font-size:0.82em;color:#9ca3af;margin-bottom:16px">Product not in inventory — fill in details to add it now.</p>
+        <div class="form-group">
+          <label>Product Name *</label>
+          <input type="text" id="qap-name" placeholder="Product name">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="qap-category"><option value="">— None —</option></select>
+          </div>
+          <div class="form-group">
+            <label>Unit</label>
+            <input type="text" id="qap-unit" placeholder="pcs / kg / ltrs" value="pcs">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Selling Price (KES)</label>
+          <input type="number" id="qap-selling-price" value="0" min="0" step="0.01">
+        </div>
+        <div class="alert" id="alert-qap"></div>
+        <button class="btn" style="width:100%;justify-content:center" onclick="saveQuickProduct()">
+          <i class="fa-solid fa-floppy-disk"></i> Save &amp; Select in GRN
+        </button>
+      </div>
+    </div>
+
     <!-- MODAL: Sale Detail -->
     <div class="modal" id="sale-detail-modal">
       <div class="modal-box" style="max-width:600px">

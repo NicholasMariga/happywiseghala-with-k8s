@@ -503,11 +503,20 @@ data:
       if (!matched) {
         const ph = document.createElement('option');
         ph.value = '';
-        ph.textContent = `— Select product for: ${name} —`;
+        ph.textContent = `— Select for: ${name} —`;
         sel.insertBefore(ph, sel.firstChild);
         sel.value = '';
         sel.style.border = '1px solid #f87171';
         sel.style.color = '#f87171';
+        const td = sel.closest('td');
+        td.style.cssText += ';display:flex;align-items:center;gap:6px';
+        const qBtn = document.createElement('button');
+        qBtn.type = 'button';
+        qBtn.className = 'btn btn-sm btn-green';
+        qBtn.title = 'Add as new product';
+        qBtn.innerHTML = '<i class="fa-solid fa-plus"></i>';
+        qBtn.onclick = () => openQuickAddProduct(sel, name);
+        td.appendChild(qBtn);
       }
       grnInputs[0].value = qty;
       grnInputs[1].value = price;
@@ -523,6 +532,55 @@ data:
         const btn = tr.querySelector('button:not([disabled])');
         if (btn) addScanRowToGrn(btn);
       });
+    }
+
+    let qapTargetSelect = null;
+
+    function openQuickAddProduct(sel, scannedName) {
+      qapTargetSelect = sel;
+      document.getElementById('qap-name').value = scannedName;
+      document.getElementById('qap-unit').value = 'pcs';
+      document.getElementById('qap-selling-price').value = '0';
+      document.getElementById('alert-qap').textContent = '';
+      const catSel = document.getElementById('qap-category');
+      catSel.innerHTML = '<option value="">— None —</option>';
+      (state.categories || []).forEach(c => {
+        catSel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+      });
+      openModal('quick-add-product-modal');
+    }
+
+    async function saveQuickProduct() {
+      const name = document.getElementById('qap-name').value.trim();
+      if (!name) return showAlert('alert-qap', 'Product name is required');
+      const body = {
+        name,
+        category_id: document.getElementById('qap-category').value || null,
+        unit: document.getElementById('qap-unit').value.trim() || 'pcs',
+        buying_price: 0,
+        selling_price: parseFloat(document.getElementById('qap-selling-price').value) || 0,
+        current_stock: 0
+      };
+      try {
+        const newProd = await api('/products', 'POST', body);
+        state.products.push(newProd);
+        if (qapTargetSelect) {
+          const ph = qapTargetSelect.querySelector('option[value=""]');
+          if (ph) ph.remove();
+          const opt = document.createElement('option');
+          opt.value = newProd.id;
+          opt.textContent = newProd.name;
+          opt.dataset.buy = newProd.buying_price || 0;
+          qapTargetSelect.appendChild(opt);
+          qapTargetSelect.value = newProd.id;
+          qapTargetSelect.style.border = '';
+          qapTargetSelect.style.color = '';
+          const qBtn = qapTargetSelect.closest('td').querySelector('button.btn-green');
+          if (qBtn) qBtn.remove();
+        }
+        closeModal('quick-add-product-modal');
+        showAlert('alert-grn', `"${name}" added to inventory and selected`, 'success');
+      } catch(e) { showAlert('alert-qap', e.message); }
     }
 
     async function saveGrn() {
