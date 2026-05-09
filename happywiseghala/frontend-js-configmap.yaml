@@ -540,7 +540,9 @@ data:
       qapTargetSelect = sel;
       document.getElementById('qap-name').value = scannedName;
       document.getElementById('qap-unit').value = 'pcs';
+      document.getElementById('qap-buying-price').value = '0';
       document.getElementById('qap-selling-price').value = '0';
+      document.getElementById('qap-reorder').value = '10';
       document.getElementById('alert-qap').textContent = '';
       const catSel = document.getElementById('qap-category');
       catSel.innerHTML = '<option value="">— None —</option>';
@@ -556,9 +558,10 @@ data:
       const body = {
         name,
         category_id: document.getElementById('qap-category').value || null,
-        unit: document.getElementById('qap-unit').value.trim() || 'pcs',
-        buying_price: 0,
+        unit: document.getElementById('qap-unit').value || 'pcs',
+        buying_price: parseFloat(document.getElementById('qap-buying-price').value) || 0,
         selling_price: parseFloat(document.getElementById('qap-selling-price').value) || 0,
+        reorder_level: parseFloat(document.getElementById('qap-reorder').value) || 10,
         current_stock: 0
       };
       try {
