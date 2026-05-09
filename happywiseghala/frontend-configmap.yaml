@@ -279,10 +279,15 @@ data:
               <div>
                 <div class="card">
                   <h3><i class="fa-solid fa-magnifying-glass"></i> Find Product</h3>
-                  <div class="search-bar" style="margin-bottom:0">
-                    <input type="text" id="pos-search" placeholder="Type product name..." oninput="posSearch()">
+                  <div class="pos-search-wrap">
+                    <input type="text" id="pos-search" placeholder="Type to search — results appear from first letter…"
+                      oninput="posSearch()"
+                      onfocus="posSearch()"
+                      onkeydown="posKeyNav(event)"
+                      autocomplete="off">
+                    <div id="pos-dropdown" class="pos-dropdown"></div>
                   </div>
-                  <div id="pos-results" style="margin-top:10px;max-height:220px;overflow-y:auto"></div>
+                  <div id="pos-added-flash" class="pos-added-flash"></div>
                 </div>
                 <div class="card">
                   <h3><i class="fa-solid fa-cart-shopping"></i> Cart</h3>

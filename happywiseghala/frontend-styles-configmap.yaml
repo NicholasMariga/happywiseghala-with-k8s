@@ -142,6 +142,17 @@ data:
     .cart-table td { padding:7px 10px; }
     .cart-table input { width:80px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:6px; padding:5px 8px; color:#fff; font-size:0.85em; text-align:right; }
 
+    /* POS PRODUCT SEARCH DROPDOWN */
+    .pos-search-wrap { position:relative; }
+    .pos-search-wrap input { width:100%; }
+    .pos-dropdown { display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:#1a1a2e; border:1px solid rgba(255,255,255,0.12); border-radius:10px; max-height:300px; overflow-y:auto; z-index:200; box-shadow:0 8px 28px rgba(0,0,0,0.5); }
+    .pos-dropdown.open { display:block; }
+    .pos-result-item { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.04); transition:background 0.1s; }
+    .pos-result-item:last-child { border-bottom:none; }
+    .pos-result-item:hover, .pos-result-item.kbd-active { background:rgba(16,185,129,0.12); }
+    .pos-result-item mark { background:rgba(16,185,129,0.28); color:inherit; border-radius:2px; padding:0 1px; }
+    .pos-added-flash { font-size:0.82em; color:#10b981; min-height:1.2em; margin-top:6px; transition:opacity 0.3s; }
+
     /* DATE FILTER ROW */
     .date-filter { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
     .date-filter label { font-size:0.78em; color:#9ca3af; }
@@ -212,4 +223,7 @@ data:
     body.light-mode .input-wrap i { color:#6b7280; }
     body.light-mode .theme-btn { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.1); color:#6b7280; }
     body.light-mode .theme-btn.active { background:linear-gradient(135deg,#10b981,#059669); color:#fff; border-color:transparent; }
+    body.light-mode .pos-dropdown { background:#ffffff; border-color:rgba(0,0,0,0.1); box-shadow:0 8px 28px rgba(0,0,0,0.12); }
+    body.light-mode .pos-result-item { border-bottom-color:rgba(0,0,0,0.05); }
+    body.light-mode .pos-result-item:hover, body.light-mode .pos-result-item.kbd-active { background:rgba(16,185,129,0.1); }
     @media(max-width:768px) { body.light-mode .sidebar { background:#ffffff; border-right-color:rgba(16,185,129,0.25); } }
