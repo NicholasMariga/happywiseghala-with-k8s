@@ -425,6 +425,65 @@ data:
       document.getElementById('grn-total').textContent='KES '+fmtNum(total);
     }
 
+    function previewReceipt(input) {
+      const name = input.files[0] ? input.files[0].name : '';
+      document.getElementById('receipt-filename').textContent = name;
+      document.getElementById('scan-btn').style.display = name ? '' : 'none';
+      document.getElementById('scan-status').textContent = '';
+    }
+
+    async function scanReceipt() {
+      const file = document.getElementById('receipt-file').files[0];
+      if (!file) return;
+      const statusEl = document.getElementById('scan-status');
+      const scanBtn = document.getElementById('scan-btn');
+      scanBtn.disabled = true;
+      statusEl.style.color = '#9ca3af';
+      statusEl.textContent = 'Scanning…';
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/stock-in/scan-receipt', {method:'POST', body:fd});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Scan failed');
+        populateGrnFromScan(data.items);
+        statusEl.style.color = '#4ade80';
+        statusEl.textContent = `✓ Found ${data.items.length} item(s)`;
+      } catch(e) {
+        statusEl.style.color = '#f87171';
+        statusEl.textContent = 'Error: ' + e.message;
+      } finally {
+        scanBtn.disabled = false;
+      }
+    }
+
+    function populateGrnFromScan(items) {
+      document.getElementById('grn-items-body').innerHTML = '';
+      items.forEach(item => {
+        addGrnRow();
+        const rows = document.querySelectorAll('#grn-items-body tr');
+        const tr = rows[rows.length - 1];
+        const sel = tr.querySelector('select');
+        const inputs = tr.querySelectorAll('input');
+        const nameLower = (item.name || '').toLowerCase();
+        let matched = false;
+        for (let opt of sel.options) {
+          if (opt.text.toLowerCase().includes(nameLower) || nameLower.includes(opt.text.toLowerCase())) {
+            sel.value = opt.value;
+            matched = true;
+            break;
+          }
+        }
+        inputs[0].value = item.quantity || 1;
+        inputs[1].value = item.unit_price || 0;
+        if (!matched) {
+          sel.style.border = '1px solid #f87171';
+          sel.title = 'No match found for: ' + item.name;
+        }
+        calcGrnTotal();
+      });
+    }
+
     async function saveGrn() {
       const rows=document.querySelectorAll('#grn-items-body tr');
       const items=[];

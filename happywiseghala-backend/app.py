@@ -591,6 +591,49 @@ def update_grn_payment(grn_id):
     return jsonify({'ok': True})
 
 
+@app.route('/stock-in/scan-receipt', methods=['POST'])
+@login_required
+def scan_receipt():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'No file selected'}), 400
+    mime = f.content_type or 'image/jpeg'
+    if not mime.startswith('image/'):
+        return jsonify({'error': 'Only image files are supported'}), 400
+    api_key = os.environ.get('GEMINI_API_KEY', '')
+    if not api_key:
+        return jsonify({'error': 'Gemini API key not configured on server'}), 500
+    try:
+        import google.generativeai as genai
+        import PIL.Image
+        import json as _json
+        import re as _re
+        import io as _io
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        img = PIL.Image.open(_io.BytesIO(f.read()))
+        prompt = (
+            'Extract all line items from this supplier receipt or invoice. '
+            'Return ONLY a raw JSON array — no markdown, no explanation. '
+            'Each object must have exactly these keys: '
+            '"name" (string), "quantity" (number), "unit_price" (number). '
+            'If quantity or unit_price cannot be determined use 1 or 0. '
+            'Example: [{"name":"Sugar 1kg","quantity":10,"unit_price":2.50}]'
+        )
+        response = model.generate_content([prompt, img])
+        text = response.text.strip()
+        text = _re.sub(r'^```(?:json)?\s*', '', text)
+        text = _re.sub(r'\s*```$', '', text)
+        items = _json.loads(text)
+        if not isinstance(items, list):
+            raise ValueError('Unexpected response format')
+        return jsonify({'items': items})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ── CUSTOMERS ─────────────────────────────────────────────────────────────────
 
 @app.route('/customers')

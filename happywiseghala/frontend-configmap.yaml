@@ -245,6 +245,17 @@ data:
                 <div class="form-group" style="flex:1 1 100%"><label>Notes</label><input type="text" id="grn-notes" placeholder="Optional"></div>
               </div>
               <h3 style="margin-bottom:10px"><i class="fa-solid fa-list"></i> Items</h3>
+              <div class="receipt-scan-bar">
+                <label class="btn btn-sm btn-purple" style="cursor:pointer">
+                  <i class="fa-solid fa-receipt"></i> Upload Receipt
+                  <input type="file" id="receipt-file" accept="image/*" style="display:none" onchange="previewReceipt(this)">
+                </label>
+                <span id="receipt-filename" style="font-size:0.82em;color:#9ca3af"></span>
+                <button class="btn btn-sm btn-green" id="scan-btn" onclick="scanReceipt()" style="display:none">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Scan &amp; Fill
+                </button>
+                <span id="scan-status" style="font-size:0.82em"></span>
+              </div>
               <div class="overflow-x">
                 <table>
                   <thead><tr><th>Product *</th><th>Qty *</th><th>Buy Price (KES) *</th><th>Expiry Date</th><th></th></tr></thead>
