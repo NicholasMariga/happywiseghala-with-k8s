@@ -481,8 +481,8 @@ data:
         const esc = v => String(v||'').replace(/"/g,'&quot;');
         tr.innerHTML = `
           <td><input type="text" value="${esc(item.name)}" style="width:180px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:5px 8px;color:#fff"></td>
-          <td><input type="number" value="${item.quantity||1}" min="0" step="0.01" style="width:70px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff"></td>
-          <td><input type="number" value="${item.unit_price||1}" min="0" step="0.01" style="width:100px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff"></td>
+          <td><input type="number" value="${item.quantity||1}" min="0" step="0.01" style="width:70px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="updateScanTotal(this)"></td>
+          <td><input type="number" value="${item.unit_price||1}" min="0" step="0.01" style="width:100px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="updateScanTotal(this)"></td>
           <td class="scan-row-total" style="white-space:nowrap;padding:8px 12px;color:#10b981;font-weight:500">${fmtNum(lineTotal)}</td>
           <td><button class="btn btn-sm btn-green" onclick="addScanRowToGrn(this)" title="Add to GRN"><i class="fa-solid fa-plus"></i></button></td>`;
         tbody.appendChild(tr);
