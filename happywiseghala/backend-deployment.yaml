@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: flask-backend
-        image: marigah/happywiseghala-backend:1.3
+        image: marigah/happywiseghala-backend:1.4
         imagePullPolicy: Always
         ports:
         - containerPort: 5000

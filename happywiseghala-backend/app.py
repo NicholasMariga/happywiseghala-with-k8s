@@ -612,7 +612,7 @@ def scan_receipt():
         import re as _re
         import io as _io
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         img = PIL.Image.open(_io.BytesIO(f.read()))
         prompt = (
             'Extract all line items from this supplier receipt or invoice. '
