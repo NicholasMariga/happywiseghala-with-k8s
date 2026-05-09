@@ -258,7 +258,7 @@ data:
               </div>
               <div class="overflow-x">
                 <table>
-                  <thead><tr><th>Product *</th><th>Qty *</th><th>Buy Price (KES) *</th><th>Expiry Date</th><th></th></tr></thead>
+                  <thead><tr><th>Product *</th><th>Qty *</th><th>Unit Price (KES) *</th><th>Line Total</th><th>Expiry Date</th><th></th></tr></thead>
                   <tbody id="grn-items-body"></tbody>
                 </table>
               </div>
@@ -285,7 +285,7 @@ data:
               <h4 style="margin-bottom:8px"><i class="fa-solid fa-list"></i> Items / Particulars</h4>
               <div class="overflow-x">
                 <table>
-                  <thead><tr><th>Item / Particular</th><th>Qty</th><th>Unit Price (KES)</th><th>Total (KES)</th><th></th></tr></thead>
+                  <thead><tr><th>Item / Particular</th><th>Qty</th><th>Unit Price (KES)</th><th>Line Total (KES)</th><th></th></tr></thead>
                   <tbody id="scan-items-body"></tbody>
                   <tfoot>
                     <tr>

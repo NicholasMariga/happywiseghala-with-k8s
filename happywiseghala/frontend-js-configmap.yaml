@@ -393,8 +393,9 @@ data:
       const productOpts = state.products.map(p=>`<option value="${p.id}" data-buy="${p.buying_price}">${p.name}</option>`).join('');
       tr.innerHTML = `
         <td><select class="product-select" style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:6px 8px;color:#fff" onchange="grnAutoPrice(this)">${productOpts}</select></td>
-        <td><input type="number" min="0.01" step="0.01" value="1" style="width:90px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="calcGrnTotal()"></td>
-        <td><input type="number" min="0" step="0.01" value="0" style="width:110px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="calcGrnTotal()"></td>
+        <td><input type="number" class="grn-qty" min="0.01" step="0.01" value="1" style="width:80px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="calcGrnRow(this)"></td>
+        <td><input type="number" class="grn-uprice" min="0" step="0.01" value="0" style="width:110px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px;color:#fff" oninput="calcGrnRow(this)"></td>
+        <td class="grn-line-total" style="white-space:nowrap;padding:8px 10px;color:#10b981;font-weight:500">0.00</td>
         <td><input type="date" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:5px 8px;color:#fff"></td>
         <td><button class="btn btn-sm btn-red" onclick="this.closest('tr').remove();calcGrnTotal()"><i class="fa-solid fa-xmark"></i></button></td>`;
       tbody.appendChild(tr);
@@ -412,17 +413,26 @@ data:
     function grnAutoPrice(sel) {
       const opt = sel.options[sel.selectedIndex];
       const row = sel.closest('tr');
-      row.querySelectorAll('input')[1].value = opt.dataset.buy||0;
+      row.querySelector('.grn-uprice').value = opt.dataset.buy || 0;
+      calcGrnRow(row.querySelector('.grn-uprice'));
+    }
+
+    function calcGrnRow(input) {
+      const tr = input.closest('tr');
+      const qty = parseFloat(tr.querySelector('.grn-qty').value) || 0;
+      const price = parseFloat(tr.querySelector('.grn-uprice').value) || 0;
+      tr.querySelector('.grn-line-total').textContent = fmtNum(qty * price);
       calcGrnTotal();
     }
 
     function calcGrnTotal() {
-      let total=0;
-      document.querySelectorAll('#grn-items-body tr').forEach(tr=>{
-        const inputs=tr.querySelectorAll('input');
-        if(inputs.length>=2) total+=(parseFloat(inputs[0].value)||0)*(parseFloat(inputs[1].value)||0);
+      let total = 0;
+      document.querySelectorAll('#grn-items-body tr').forEach(tr => {
+        const qty = parseFloat(tr.querySelector('.grn-qty')?.value) || 0;
+        const price = parseFloat(tr.querySelector('.grn-uprice')?.value) || 0;
+        total += qty * price;
       });
-      document.getElementById('grn-total').textContent='KES '+fmtNum(total);
+      document.getElementById('grn-total').textContent = 'KES ' + fmtNum(total);
     }
 
     function previewReceipt(input) {
