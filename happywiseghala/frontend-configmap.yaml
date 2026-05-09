@@ -630,6 +630,22 @@ data:
               </div>
               <button class="btn" onclick="saveSettings()"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
             </div>
+            <div class="card">
+              <h3><i class="fa-solid fa-sliders"></i> Preferences</h3>
+              <p style="font-size:0.82em;color:#6b7280;margin-bottom:12px">Stored on this device only.</p>
+              <div class="form-group" style="margin-bottom:4px">
+                <label>App Theme</label>
+                <div class="theme-toggle-wrap">
+                  <button class="theme-btn" id="theme-btn-dark" onclick="setTheme('dark')">
+                    <i class="fa-solid fa-moon"></i> Dark
+                  </button>
+                  <button class="theme-btn" id="theme-btn-light" onclick="setTheme('light')">
+                    <i class="fa-solid fa-sun"></i> Light
+                  </button>
+                </div>
+                <small style="color:#6b7280;font-size:0.78em;display:block;margin-top:6px">Changes the app colour theme (saved on this device)</small>
+              </div>
+            </div>
           </div>
 
         </div>
