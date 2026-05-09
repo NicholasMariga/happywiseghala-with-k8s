@@ -268,6 +268,39 @@ data:
                 <button class="btn" onclick="saveGrn()"><i class="fa-solid fa-floppy-disk"></i> Save GRN & Update Stock</button>
               </div>
             </div>
+
+            <!-- RECEIPT SCAN RESULTS CARD -->
+            <div class="card" id="scan-result-card" style="display:none">
+              <h3><i class="fa-solid fa-receipt"></i> Receipt Scan Results</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+                <div class="form-group" style="margin:0">
+                  <label><i class="fa-solid fa-building"></i> Header — Supplier Info</label>
+                  <textarea id="scan-header" class="scan-textarea" rows="5" readonly></textarea>
+                </div>
+                <div class="form-group" style="margin:0">
+                  <label><i class="fa-solid fa-file-invoice-dollar"></i> Footer — Totals &amp; Payment</label>
+                  <textarea id="scan-footer" class="scan-textarea" rows="5" readonly></textarea>
+                </div>
+              </div>
+              <h4 style="margin-bottom:8px"><i class="fa-solid fa-list"></i> Items / Particulars</h4>
+              <div class="overflow-x">
+                <table>
+                  <thead><tr><th>Item / Particular</th><th>Qty</th><th>Unit Price (KES)</th><th>Total (KES)</th><th></th></tr></thead>
+                  <tbody id="scan-items-body"></tbody>
+                  <tfoot>
+                    <tr>
+                      <td colspan="3" style="text-align:right;font-weight:600;padding:8px 12px">Grand Total</td>
+                      <td id="scan-grand-total" style="font-weight:600;padding:8px 12px;color:#10b981"></td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <button class="btn btn-sm btn-green" onclick="addAllToGrn()" style="margin-top:10px">
+                <i class="fa-solid fa-plus"></i> Add All to GRN
+              </button>
+            </div>
+
             <div class="card">
               <h3><i class="fa-solid fa-history"></i> GRN History</h3>
               <div class="search-bar">

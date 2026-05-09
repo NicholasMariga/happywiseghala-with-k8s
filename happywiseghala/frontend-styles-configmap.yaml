@@ -156,9 +156,11 @@ data:
     .pos-result-item mark { background:rgba(16,185,129,0.28); color:inherit; border-radius:2px; padding:0 1px; }
     .pos-added-flash { font-size:0.82em; color:#10b981; min-height:1.2em; margin-top:6px; transition:opacity 0.3s; }
 
-    /* RECEIPT SCAN BAR */
+    /* RECEIPT SCAN BAR + SCAN RESULTS */
     .receipt-scan-bar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; padding:10px 14px; background:rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.15); border-radius:8px; }
     body.light-mode .receipt-scan-bar { background:rgba(0,0,0,0.03); border-color:rgba(0,0,0,0.15); }
+    .scan-textarea { width:100%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:8px 12px; color:#e2e8f0; font-size:0.83em; resize:vertical; line-height:1.6; font-family:inherit; }
+    body.light-mode .scan-textarea { background:#fff; border-color:#d1d5db; color:#111827; }
 
     /* DATE FILTER ROW */
     .date-filter { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }

@@ -613,12 +613,22 @@ def scan_receipt():
         client = Groq(api_key=api_key)
         b64 = _b64.b64encode(f.read()).decode('utf-8')
         prompt = (
-            'Extract all line items from this supplier receipt or invoice. '
-            'Return ONLY a raw JSON array — no markdown, no explanation. '
-            'Each object must have exactly these keys: '
-            '"name" (string), "quantity" (number), "unit_price" (number). '
-            'If quantity or unit_price cannot be determined use 1 or 0. '
-            'Example: [{"name":"Sugar 1kg","quantity":10,"unit_price":2.50}]'
+            'Analyze this supplier receipt or invoice carefully and extract all information. '
+            'Return ONLY a raw JSON object — no markdown, no explanation, no extra text. '
+            'The JSON must have exactly three keys: '
+            '"header" (string): all information from the top of the receipt — supplier/company name, '
+            'address, location, telephone, email, KRA PIN, invoice/receipt number, date, '
+            'paybill number, account number, mpesa details — format as readable multi-line text; '
+            '"items" (array): every line item or particular listed — each as an object with '
+            '"name" (string), "quantity" (number), "unit_price" (number) — '
+            'note: some receipts label this column "Particulars" instead of "Items", treat them the same — '
+            'use 1 for quantity and 0 for unit_price if values cannot be determined; '
+            '"footer" (string): all information from the bottom of the receipt — subtotal, '
+            'VAT rate, VAT amount, total amount, payment mode (cash/mpesa/cheque), '
+            'change/balance — format as readable multi-line text. '
+            'Example: {"header":"ABC Ltd\\nNairobi\\nTel:0700000000\\nPIN:A123456789Z\\nInv:INV-001\\nDate:01/01/2025",'
+            '"items":[{"name":"Sugar 1kg","quantity":10,"unit_price":120}],'
+            '"footer":"Subtotal: 1200\\nVAT 16%: 192\\nTotal: 1392\\nM-PESA"}'
         )
         response = client.chat.completions.create(
             model='meta-llama/llama-4-scout-17b-16e-instruct',
@@ -629,15 +639,22 @@ def scan_receipt():
                     {'type': 'text', 'text': prompt}
                 ]
             }],
-            max_tokens=1024
+            max_tokens=2048
         )
         text = response.choices[0].message.content.strip()
         text = _re.sub(r'^```(?:json)?\s*', '', text)
         text = _re.sub(r'\s*```$', '', text)
-        items = _json.loads(text)
-        if not isinstance(items, list):
+        result = _json.loads(text)
+        if not isinstance(result, dict):
             raise ValueError('Unexpected response format')
-        return jsonify({'items': items})
+        items = result.get('items', [])
+        if not isinstance(items, list):
+            items = []
+        return jsonify({
+            'header': result.get('header', ''),
+            'items': items,
+            'footer': result.get('footer', '')
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
