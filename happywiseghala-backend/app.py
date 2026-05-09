@@ -620,15 +620,19 @@ def scan_receipt():
             'address, location, telephone, email, KRA PIN, invoice/receipt number, date, '
             'paybill number, account number, mpesa details — format as readable multi-line text; '
             '"items" (array): every line item or particular listed — each as an object with '
-            '"name" (string), "quantity" (number), "unit_price" (number) — '
+            '"name" (string), "quantity" (number), "unit_price" (number), "line_total" (number) — '
             'note: some receipts label this column "Particulars" instead of "Items", treat them the same — '
-            'use 1 for quantity and 0 for unit_price if values cannot be determined; '
+            'IMPORTANT rules for each line item field: '
+            '"quantity": if QTY/quantity is clearly visible use that exact value, otherwise use 1; '
+            '"unit_price": if unit price/price/rate is clearly visible use that exact value, otherwise use 1; '
+            '"line_total": if a line total/amount/value is clearly visible use that exact value, otherwise use 0; '
+            'Exception: if quantity, unit_price AND line_total are ALL completely absent or unreadable set all three to 0; '
             '"footer" (string): all information from the bottom of the receipt — subtotal, '
             'VAT rate, VAT amount, total amount, payment mode (cash/mpesa/cheque), '
             'change/balance — format as readable multi-line text. '
             'Example: {"header":"ABC Ltd\\nNairobi\\nTel:0700000000\\nPIN:A123456789Z\\nInv:INV-001\\nDate:01/01/2025",'
-            '"items":[{"name":"Sugar 1kg","quantity":10,"unit_price":120}],'
-            '"footer":"Subtotal: 1200\\nVAT 16%: 192\\nTotal: 1392\\nM-PESA"}'
+            '"items":[{"name":"Sugar 1kg","quantity":10,"unit_price":120,"line_total":1200},{"name":"Bread","quantity":1,"unit_price":250,"line_total":250}],'
+            '"footer":"Subtotal: 1450\\nVAT 16%: 232\\nTotal: 1682\\nM-PESA"}'
         )
         response = client.chat.completions.create(
             model='meta-llama/llama-4-scout-17b-16e-instruct',
