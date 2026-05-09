@@ -565,6 +565,32 @@ def create_grn():
     return jsonify(grn), 201
 
 
+@app.route('/stock-in/<int:grn_id>/payment', methods=['PATCH'])
+@login_required
+def update_grn_payment(grn_id):
+    if session.get('role') not in ('owner', 'manager'):
+        return jsonify({'error': 'Forbidden'}), 403
+    data = request.json
+    status = data.get('payment_status', '')
+    if status not in ('unpaid', 'partial', 'paid'):
+        return jsonify({'error': 'Invalid payment status'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        "UPDATE stock_in SET payment_status=%s WHERE id=%s RETURNING grn_number",
+        (status, grn_id)
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close()
+        return jsonify({'error': 'GRN not found'}), 404
+    log_action(conn, 'grn_payment_updated', f"GRN {row['grn_number']} payment → {status}")
+    conn.commit()
+    cur.close()
+    conn.close()
+    return jsonify({'ok': True})
+
+
 # ── CUSTOMERS ─────────────────────────────────────────────────────────────────
 
 @app.route('/customers')

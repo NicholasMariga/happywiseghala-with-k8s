@@ -375,7 +375,10 @@ data:
         <td>${fmt(g.total_amount)}</td>
         <td><span class="badge ${payBadge[g.payment_status]||'badge-gray'}">${g.payment_status}</span></td>
         <td>${g.received_by_name||'—'}</td><td>${fmtDateTime(g.created_at)}</td>
-        <td><button class="btn btn-sm btn-blue" onclick="viewGrn(${g.id})"><i class="fa-solid fa-eye"></i> View</button></td></tr>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-blue" onclick="viewGrn(${g.id})"><i class="fa-solid fa-eye"></i> View</button>
+          <button class="btn btn-sm btn-yellow" onclick="openGrnPaymentModal(${g.id},'${g.grn_number}','${g.payment_status}')"><i class="fa-solid fa-money-bill-transfer"></i> Payment</button>
+        </td></tr>
       `).join('') || '<tr><td colspan="7" style="text-align:center;color:#6b7280;padding:20px">No GRNs yet</td></tr>';
     }
 
@@ -463,6 +466,24 @@ data:
       const ws=XLSX.utils.json_to_sheet(state.grns.map(g=>({'GRN#':g.grn_number,Supplier:g.supplier_name||'—','Total (KES)':g.total_amount,Payment:g.payment_status,'Received By':g.received_by_name||'—',Date:fmtDateTime(g.created_at)})));
       const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'GRNs');
       XLSX.writeFile(wb,'grn-history.xlsx');
+    }
+
+    function openGrnPaymentModal(id, grnNumber, currentStatus) {
+      document.getElementById('grn-pay-id').value = id;
+      document.getElementById('grn-pay-label').textContent = grnNumber + ' — current status: ' + currentStatus;
+      document.getElementById('grn-pay-status').value = currentStatus;
+      document.getElementById('alert-grn-pay').className = 'alert';
+      openModal('grn-payment-modal');
+    }
+
+    async function saveGrnPayment() {
+      const id = document.getElementById('grn-pay-id').value;
+      const status = document.getElementById('grn-pay-status').value;
+      try {
+        await api('/stock-in/'+id+'/payment', 'PATCH', {payment_status: status});
+        closeModal('grn-payment-modal');
+        await loadGrns();
+      } catch(e) { showAlert('alert-grn-pay', e.message); }
     }
 
     // ── SALES (POS) ────────────────────────────────────────────────────────────

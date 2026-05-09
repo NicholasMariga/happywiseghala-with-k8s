@@ -678,6 +678,28 @@ data:
       </div>
     </div>
 
+    <!-- MODAL: GRN Payment Update -->
+    <div class="modal" id="grn-payment-modal">
+      <div class="modal-box" style="max-width:380px">
+        <span class="modal-close" onclick="closeModal('grn-payment-modal')"><i class="fa-solid fa-xmark"></i></span>
+        <h3><i class="fa-solid fa-money-bill-transfer"></i> Update Payment Status</h3>
+        <input type="hidden" id="grn-pay-id">
+        <p id="grn-pay-label" style="font-size:0.83em;color:#9ca3af;margin-bottom:14px"></p>
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Payment Status</label>
+          <select id="grn-pay-status">
+            <option value="unpaid">Unpaid</option>
+            <option value="partial">Partial</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div class="alert" id="alert-grn-pay"></div>
+        <button class="btn" style="width:100%;justify-content:center" onclick="saveGrnPayment()">
+          <i class="fa-solid fa-floppy-disk"></i> Save
+        </button>
+      </div>
+    </div>
+
     <!-- MODAL: Sale Detail -->
     <div class="modal" id="sale-detail-modal">
       <div class="modal-box" style="max-width:600px">
