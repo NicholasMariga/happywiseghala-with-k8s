@@ -492,10 +492,22 @@ data:
       const sel = newTr.querySelector('select');
       const grnInputs = newTr.querySelectorAll('input');
       const nameLower = name.toLowerCase();
+      let matched = false;
       for (let opt of sel.options) {
         if (opt.text.toLowerCase().includes(nameLower) || nameLower.includes(opt.text.toLowerCase())) {
-          sel.value = opt.value; break;
+          sel.value = opt.value;
+          matched = true;
+          break;
         }
+      }
+      if (!matched) {
+        const ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = `— Select product for: ${name} —`;
+        sel.insertBefore(ph, sel.firstChild);
+        sel.value = '';
+        sel.style.border = '1px solid #f87171';
+        sel.style.color = '#f87171';
       }
       grnInputs[0].value = qty;
       grnInputs[1].value = price;
@@ -503,6 +515,7 @@ data:
       btn.innerHTML = '<i class="fa-solid fa-check"></i>';
       btn.classList.replace('btn-green','btn-blue');
       btn.disabled = true;
+      newTr.scrollIntoView({behavior:'smooth', block:'nearest'});
     }
 
     function addAllToGrn() {
