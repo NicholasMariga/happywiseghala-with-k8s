@@ -602,18 +602,16 @@ def scan_receipt():
     mime = f.content_type or 'image/jpeg'
     if not mime.startswith('image/'):
         return jsonify({'error': 'Only image files are supported'}), 400
-    api_key = os.environ.get('GEMINI_API_KEY', '')
+    api_key = os.environ.get('GROQ_API_KEY', '')
     if not api_key:
-        return jsonify({'error': 'Gemini API key not configured on server'}), 500
+        return jsonify({'error': 'Groq API key not configured on server'}), 500
     try:
-        import google.generativeai as genai
-        import PIL.Image
+        from groq import Groq
+        import base64 as _b64
         import json as _json
         import re as _re
-        import io as _io
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        img = PIL.Image.open(_io.BytesIO(f.read()))
+        client = Groq(api_key=api_key)
+        b64 = _b64.b64encode(f.read()).decode('utf-8')
         prompt = (
             'Extract all line items from this supplier receipt or invoice. '
             'Return ONLY a raw JSON array — no markdown, no explanation. '
@@ -622,8 +620,18 @@ def scan_receipt():
             'If quantity or unit_price cannot be determined use 1 or 0. '
             'Example: [{"name":"Sugar 1kg","quantity":10,"unit_price":2.50}]'
         )
-        response = model.generate_content([prompt, img])
-        text = response.text.strip()
+        response = client.chat.completions.create(
+            model='meta-llama/llama-4-scout-17b-16e-instruct',
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{b64}'}},
+                    {'type': 'text', 'text': prompt}
+                ]
+            }],
+            max_tokens=1024
+        )
+        text = response.choices[0].message.content.strip()
         text = _re.sub(r'^```(?:json)?\s*', '', text)
         text = _re.sub(r'\s*```$', '', text)
         items = _json.loads(text)

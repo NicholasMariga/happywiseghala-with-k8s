@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: flask-backend
-        image: marigah/happywiseghala-backend:1.4
+        image: marigah/happywiseghala-backend:1.5
         imagePullPolicy: Always
         ports:
         - containerPort: 5000
@@ -40,8 +40,8 @@ spec:
             secretKeyRef:
               name: postgres-secret
               key: ADMIN_PASSWORD
-        - name: GEMINI_API_KEY
+        - name: GROQ_API_KEY
           valueFrom:
             secretKeyRef:
-              name: gemini-secret
-              key: GEMINI_API_KEY
+              name: groq-secret
+              key: GROQ_API_KEY

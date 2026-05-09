@@ -4,5 +4,6 @@ __pycache__/
 *.log
 happywiseghala/database-secret.yaml
 happywiseghala/gemini-secret.yaml
+happywiseghala/groq-secret.yaml
 start-app.bat
 stop-app.bat
